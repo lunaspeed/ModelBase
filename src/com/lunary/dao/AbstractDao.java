@@ -40,11 +40,9 @@ public abstract class AbstractDao<T extends TableEntity> {
       return getModelClass().newInstance();
     }
     catch (InstantiationException e) {
-      //LoggerUtil.BASE_LOGGER.error("error instantiating class", e);
       throw new RuntimeException("error instantiating class", e);
     }
     catch (IllegalAccessException e) {
-      //LoggerUtil.BASE_LOGGER.error("error instantiating class with illegal access", e);
       throw new RuntimeException("error instantiating class with illegal access", e);
     }
   }
