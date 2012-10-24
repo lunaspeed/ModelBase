@@ -9,7 +9,7 @@ import org.apache.commons.dbutils.BasicRowProcessor;
 import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.commons.dbutils.RowProcessor;
 
-import com.lunary.database.SpringBeanProcessor;
+import com.lunary.database.BaseBeanProcessor;
 import com.lunary.database.BasePageContainer;
 import com.lunary.database.PageContainer;
 
@@ -26,7 +26,7 @@ abstract class AbstractPaginationHandler<E> implements ResultSetHandler<PageCont
      * the default scoping to allow only classes in this package to use this
      * instance.
      */
-    static final RowProcessor ROW_PROCESSOR = new BasicRowProcessor(new SpringBeanProcessor());
+    static final RowProcessor ROW_PROCESSOR = new BasicRowProcessor(new BaseBeanProcessor());
 
     private int startingRow = 0;
     private int endingRow = 0;

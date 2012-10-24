@@ -36,7 +36,7 @@ public class DefaultSqlUtil extends AbstractSqlUtil {
     int cnt = 0;
     if(entity instanceof IdKeyedTableEntity) {
       try {
-        PreparedStatement stmt = getQueryRunner().getDataSource().getConnection().prepareStatement(sset.getSql(), ID_FIELD); 
+        PreparedStatement stmt = getConnection().prepareStatement(sset.getSql(), ID_FIELD); 
         getQueryRunner().fillStatement(stmt, sset.getParams());
         cnt = stmt.executeUpdate();
         ResultSet rs = stmt.getGeneratedKeys();
@@ -76,7 +76,7 @@ public class DefaultSqlUtil extends AbstractSqlUtil {
     int cnt = 0;
     try {
       convertParams(params);
-      cnt = getQueryRunner().update(sql, params);
+      cnt = getQueryRunner().update(getConnection(), sql, params);
     }
     catch(SQLException e) {
       throw translateException(e);

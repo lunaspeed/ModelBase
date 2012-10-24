@@ -1,112 +1,48 @@
 <?xml version="1.0"?>
-<project name="Negents-Base" basedir="." default="core-jar-for-1.6">
+<project name="Model-Base" basedir="." default="core-jar">
 
 	<property name="native.encoding" value="utf-8" />
-	<property name="src.dir" value="${basedir}/Base" />
-	<property name="src.tag.dir" value="${basedir}/Struts" />
+	<property name="src.dir" value="${basedir}/src" />
+	<property name="src.dir.spring" value="${basedir}/spring" />
 	<property name="bin.dir" value="${basedir}/bin" />
-	<property name="lab-src.dir" value="${basedir}/lab-src" />
-	<property name="lab-bin.dir" value="${basedir}/lab-bin" />
 	<property name="dist.dir" value="${basedir}/dist" />
 	<property name="lib.dir" value="${basedir}/lib" />
-	<property name="develop.lib" value="${basedir}/dev-lib" />
-
-	<splash imageurl="file:///E:/pic/kenshin03.jpg"/>
-
 
 	<path id="project.classpath">
 		<path location="${bin.dir}" />
 		<fileset dir="${lib.dir}">
 			<include name="**/*.jar" />
 		</fileset>
-		<fileset dir="${develop.lib}">
-            <include name="**/*.jar" />
-        </fileset>
-		<!--pathelement path="${java.class.path}"/-->
 	</path>
 
 	<target name="compile">
-		<javac srcdir="${src.dir}" destdir="${bin.dir}">
+		<javac srcdir="${src.dir}" destdir="${bin.dir}" encoding="utf-8" source="1.6" target="1.6" includeantruntime="false">
 			<classpath refid="project.classpath" />
 		</javac>
-		<javac srcdir="${src.tag.dir}" destdir="${bin.dir}">
-            <classpath refid="project.classpath" />
-        </javac>
+		<javac srcdir="${src.dir.spring}" destdir="${bin.dir}" encoding="utf-8" source="1.6" target="1.6" includeantruntime="false">
+      <classpath refid="project.classpath" />
+    </javac>
 		<!--
 			<javac srcdir="${lab-src.dir}" destdir="${lab-bin.dir}"> <classpath
 			refid="project.classpath" /> </javac>
 		-->
 	</target>
-	
-	<target name="build-all" depends="core-jar-for-1.6,core-struts-jar">
-	</target>
 
-	<target name="core-jar-for-1.6" depends="compile,native2ascii">
-		<jar jarfile="${dist.dir}/netgents-base.jar">
-
+	<target name="core-jar" depends="compile">
+		<jar jarfile="${dist.dir}/lunary-modelbase.jar">
 			<fileset dir="${bin.dir}">
-				<exclude name="**/*.property" />
-				<include name="com/netgents/base/**" />
-			</fileset>
-
-		</jar>
-	</target>
-	
-	<target name="core-struts-jar" depends="generate-taglib">
-		<jar jarfile="${dist.dir}/netgents-struts.jar">
-
-			<fileset dir="${bin.dir}">
-				<exclude name="**/*.property" />
-				<include name="com/netgents/struts/**" />
-				<include name="META-INF/**" />
-				<include name="template/**" />
+				<include name="com/lunary/**" />
+				<exclude name="com/lunary/spring/**"/>
 			</fileset>
 		</jar>
 	</target>
 	
-	<target name="native2ascii">
-		<native2ascii encoding="${native.encoding}" src="${src.dir}"
-			dest="${src.dir}" includes="**/*.${native.encoding}" ext=".properties" />
-		<!--
-			<delete> <fileset dir="${bin.dir}" includes="**/*.${native.encoding}"
-			/> </delete>
-		-->
-	</target>
-
-    <path id="tags.classpath">
-        <path location="${bin.dir}"/>
-        <fileset dir="${lib.dir}">
-            <include name="**/*.jar" />
-        </fileset>
-        <fileset dir="${develop.lib}">
-            <include name="**/*.jar" />
-        </fileset>
-    </path>
-    
-	<target name="generate-taglib" depends="compile">
-		<apt classpathref="tags.classpath" factorypathref="tags.classpath"
-			srcdir="Struts" compile="false" destdir="dist/apt" fork="true"
-			preprocessdir="bin" verbose="false" source="1.5" encoding="utf-8"
-
-			factory="org.apache.struts.annotations.taglib.apt.TLDAnnotationProcessorFactory">
-
-			<compilerarg value="-AtlibVersion=1.0" />
-			<compilerarg value="-AjspVersion=2.0" />
-			<compilerarg value="-AshortName=nx" />
-			<compilerarg value="-Auri=/struts-nx-tags" />
-			<compilerarg value="-Adescription='Struts NX Tags'" />
-			<compilerarg value="-AdisplayName='Struts NX Tags'" />
-			<compilerarg value="-AoutTemplatesDir=${basedir}/dist/taglib-doc" />
-			<compilerarg value="-AoutFile=${basedir}/bin/META-INF/struts-nx-tags.tld" />
-
-			<!-- Apt Debug options -->
-			<!-- 
-				<compilerarg value="-print"/> <compilerarg
-				value="-XListAnnotationTypes"/> <compilerarg
-				value="-XListDeclarations"/> <compilerarg value="-XPrintAptRounds"/>
-				<compilerarg value="-XPrintFactoryInfo"/>
-			-->
-		</apt>
-	</target>
+	<target name="spring-jar" depends="compile">
+    <jar jarfile="${dist.dir}/lunary-modelbase-spring.jar">
+      <fileset dir="${bin.dir}">
+        <include name="com/lunary/spring/**" />
+      </fileset>
+    </jar>
+  </target>
 
 </project>

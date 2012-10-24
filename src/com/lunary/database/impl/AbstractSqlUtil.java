@@ -1,6 +1,7 @@
 
 package com.lunary.database.impl;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,6 +49,10 @@ public abstract class AbstractSqlUtil implements SqlUtil {
     return dataSource;
   }
   
+  protected Connection getConnection() throws SQLException {
+    return dataSource.getConnection();
+  }
+  
   /**
    * {@inheritDoc}
    */
@@ -88,7 +93,7 @@ public abstract class AbstractSqlUtil implements SqlUtil {
     int cnt = 0;
     try {
       convertParams(params);
-      Integer result = queryRunner.query(sql, new ScalarHandler<Integer>(), params);
+      Integer result = queryRunner.query(getConnection(), sql, new ScalarHandler<Integer>(), params);
       if(result != null) {
         cnt = ((Integer) result).intValue();//jdbcTemplate.queryForInt(sql, params);
       }
@@ -230,7 +235,7 @@ public abstract class AbstractSqlUtil implements SqlUtil {
     E obj = null;
     try {
       convertParams(params);
-      obj = getQueryRunner().query(sql, rsHandler, params);
+      obj = getQueryRunner().query(getConnection(), sql, rsHandler, params);
     }
     catch (SQLException e) {
       throw translateException(e);
