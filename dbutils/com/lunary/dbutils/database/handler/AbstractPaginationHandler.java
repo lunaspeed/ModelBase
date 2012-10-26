@@ -1,4 +1,4 @@
-package com.lunary.database.handler;
+package com.lunary.dbutils.database.handler;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -9,9 +9,10 @@ import org.apache.commons.dbutils.BasicRowProcessor;
 import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.commons.dbutils.RowProcessor;
 
-import com.lunary.database.BaseBeanProcessor;
 import com.lunary.database.BasePageContainer;
 import com.lunary.database.PageContainer;
+import com.lunary.dbutils.database.BaseBeanProcessor;
+import com.lunary.dbutils.database.BaseColumnMapper;
 
 abstract class AbstractPaginationHandler<E> implements ResultSetHandler<PageContainer<E>> {
 
@@ -26,7 +27,7 @@ abstract class AbstractPaginationHandler<E> implements ResultSetHandler<PageCont
      * the default scoping to allow only classes in this package to use this
      * instance.
      */
-    static final RowProcessor ROW_PROCESSOR = new BasicRowProcessor(new BaseBeanProcessor());
+    static final RowProcessor ROW_PROCESSOR = new BasicRowProcessor(new BaseBeanProcessor(new BaseColumnMapper()));
 
     private int startingRow = 0;
     private int endingRow = 0;
@@ -56,7 +57,7 @@ abstract class AbstractPaginationHandler<E> implements ResultSetHandler<PageCont
         List<E> rows = new ArrayList<E>(rowsPerPage);
         int cnt = 0;
         while (rs.next()) {
-            cnt++;
+            cnt += 1;
             if (cnt >= startingRow && cnt <= endingRow) {
                 rows.add(this.handleRow(rs));
             }
@@ -64,8 +65,9 @@ abstract class AbstractPaginationHandler<E> implements ResultSetHandler<PageCont
         container.setRows(rows);
         container.setTotalRows(cnt);
         int totalPages = cnt / rowsPerPage;
-        if (cnt % rowsPerPage != 0)
+        if (cnt % rowsPerPage != 0) {
             totalPages += 1;
+        }
         container.setTotalPages(totalPages);
         return container;
     }

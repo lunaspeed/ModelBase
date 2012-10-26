@@ -8,7 +8,8 @@ package com.lunary.database;
  */
 public enum DatabaseType {
     /** MS SQL Server */
-    MSSQL,
+    MSSQL95,
+    MSSQL2008,
     /** IBM DB2 */
     DB2,
     /** Oracle */

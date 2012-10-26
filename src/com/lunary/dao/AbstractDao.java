@@ -9,30 +9,34 @@ import com.lunary.model.TableEntity;
 
 public abstract class AbstractDao<T extends TableEntity> {
 
-  private SqlUtil sqlUtil;
-  
-  protected SqlUtil getSqlUtil() {
-    return sqlUtil;
-  }
+//  private final SqlUtil sqlUtil;
+//  
+//  public AbstractDao(SqlUtil sqlUtil) {
+//    this.sqlUtil = sqlUtil;
+//  }
+//  
+//  protected SqlUtil getSqlUtil() {
+//    return sqlUtil;
+//  }
   
   public int insert(T model) {
-    return sqlUtil.insert(model);
+    return getSqlUtil().insert(model);
   }
   
   public int delete(T model) {
-    return sqlUtil.delete(model);
+    return getSqlUtil().delete(model);
   }
   
   public int update(T model) {
-    return sqlUtil.update(model);
+    return getSqlUtil().update(model);
   }
   
   public int updateWithNull(T model) {
-    return sqlUtil.updateWithNull(model);
+    return getSqlUtil().updateWithNull(model);
   }
   
   public List<T> findAll() {
-    return sqlUtil.find("SELECT * FROM "+getInstance().getTableName(), getModelClass());
+    return getSqlUtil().find("SELECT * FROM "+getInstance().getTableName(), getModelClass());
   }
  
   protected T getInstance() {
@@ -48,4 +52,5 @@ public abstract class AbstractDao<T extends TableEntity> {
   }
   
   protected abstract Class<T> getModelClass();
+  protected abstract SqlUtil getSqlUtil();
 }

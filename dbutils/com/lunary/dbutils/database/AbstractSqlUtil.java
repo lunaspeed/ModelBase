@@ -1,5 +1,5 @@
 
-package com.lunary.database.impl;
+package com.lunary.dbutils.database;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -21,12 +21,12 @@ import org.apache.commons.dbutils.handlers.ScalarHandler;
 import com.lunary.database.PageContainer;
 import com.lunary.database.SqlUtil;
 import com.lunary.database.exception.DatabaseException;
-import com.lunary.database.handler.BeanPaginationHandler;
-import com.lunary.database.handler.BeanTopHandler;
-import com.lunary.database.handler.MapPaginationHandler;
-import com.lunary.database.handler.MapTopHandler;
 import com.lunary.database.util.StatementUtil;
 import com.lunary.database.util.TableEntityUtil;
+import com.lunary.dbutils.database.handler.BeanPaginationHandler;
+import com.lunary.dbutils.database.handler.BeanTopHandler;
+import com.lunary.dbutils.database.handler.MapPaginationHandler;
+import com.lunary.dbutils.database.handler.MapTopHandler;
 import com.lunary.model.TableEntity;
 
 public abstract class AbstractSqlUtil implements SqlUtil {
@@ -74,9 +74,7 @@ public abstract class AbstractSqlUtil implements SqlUtil {
     StringBuilder sql = new StringBuilder("SELECT * FROM ");
     sql.append(entity.getTableName()).append(" WHERE ");
     sql.append(StatementUtil.assembleKeyStatement(entity, keyValues));
-    // if(AppStaticConfig.BASE_DEBUG) {
-    // LoggerUtil.debug(sql.toString() + " params: " + keyValues.toString());
-    // }
+    //logger.debug(sql.toString() + " params: " + keyValues.toString());
     return (E) this.findOne(sql.toString(), entity.getClass(), keyValues.toArray());
   }
 

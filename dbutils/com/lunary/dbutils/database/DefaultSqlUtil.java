@@ -1,5 +1,5 @@
 
-package com.lunary.database.impl;
+package com.lunary.dbutils.database;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

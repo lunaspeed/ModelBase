@@ -10,7 +10,6 @@ import org.apache.commons.beanutils.MethodUtils;
 
 import com.lunary.database.annotation.SqlExclude;
 import com.lunary.model.TableEntity;
-import com.lunary.util.DateUtil;
 import com.lunary.util.FieldMethodUtil;
 import com.lunary.util.ReflectionUtil;
 
@@ -93,7 +92,7 @@ public final class TableEntityUtil {
     if(value != null) {
       try {
         if (clazz == java.util.Date.class) {
-          value = DateUtil.getTimestamp((java.util.Date) value);
+          value = new java.sql.Timestamp(((java.util.Date) value).getTime());
         }
         else if (Enum.class.isAssignableFrom(clazz)) {
           value = value.toString();

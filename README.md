@@ -1,1 +1,1 @@
-This is a simple utility for accessing databases. 
+This is a simple utility for accessing databases.

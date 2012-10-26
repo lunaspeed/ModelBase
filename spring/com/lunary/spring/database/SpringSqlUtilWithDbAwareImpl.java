@@ -9,9 +9,9 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.lob.LobHandler;
 
 import com.lunary.database.BasePageContainer;
+import com.lunary.database.ColumnMapper;
 import com.lunary.database.DatabaseType;
 import com.lunary.database.PageContainer;
 import com.lunary.database.PaginateSqlTemplate;
@@ -30,7 +30,6 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
   private final PaginateSqlTemplate paginateTemplate;
   private final TopSqlTemplate topTemplate;
   private final Pattern orderByPattern = Pattern.compile(" ORDER BY ", Pattern.CASE_INSENSITIVE);
-  //private final DatabaseType databaseType;
 
   /**
    * Consturctor
@@ -38,16 +37,16 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
    * @param jdbcTemplate
    * @param queryRunner
    * @param databaseType
-   *          MSSQL, DB2, ORACLE, or SYBASE
-   * @param lobHandler
+   *          MSSQL, DB2, ORACLE, or SYBASE {@see com.lunary.database.DatabaseType}
+   * @param columnMapper
    * @throws IllegalArgumentException
-   *           databaseType is not MSSQL, DB2, ORACLE, or SYBASE
+   *           databaseType is not MSSQL, DB2, ORACLE, or SYBASE {@see com.lunary.database.DatabaseType}
    * @throws NullPointerException
    *           if any argument is null
    */
-  public SpringSqlUtilWithDbAwareImpl(JdbcTemplate jdbcTemplate, DataSource dataSource, String databaseType, LobHandler lobHandler) throws IllegalArgumentException, NullPointerException {
+  public SpringSqlUtilWithDbAwareImpl(JdbcTemplate jdbcTemplate, DataSource dataSource, String databaseType, ColumnMapper columnMapper) throws IllegalArgumentException, NullPointerException {
 
-    this(jdbcTemplate, dataSource, Enum.valueOf(DatabaseType.class, databaseType.toUpperCase()), lobHandler);
+    this(jdbcTemplate, dataSource, Enum.valueOf(DatabaseType.class, databaseType.toUpperCase()), columnMapper);
   }
 
   /**
@@ -56,16 +55,13 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
    * @param jdbcTemplate
    * @param queryRunner
    * @param databaseType
-   * @param lobHandler
-
-   * @throws IllegalArgumentException
-   *           databaseType is not currently supported
+   * @param columnMapper
    * @throws NullPointerException
    *           if jdbcTemplate or databaseType is null
    */
-  public SpringSqlUtilWithDbAwareImpl(JdbcTemplate jdbcTemplate, DataSource dataSource, DatabaseType databaseType, LobHandler lobHandler) throws IllegalArgumentException, NullPointerException {
+  public SpringSqlUtilWithDbAwareImpl(JdbcTemplate jdbcTemplate, DataSource dataSource, DatabaseType databaseType, ColumnMapper columnMapper) throws NullPointerException {
 
-    super(jdbcTemplate, dataSource, lobHandler);
+    super(jdbcTemplate, dataSource, columnMapper);
 
     //this.databaseType = databaseType;
 
@@ -77,7 +73,7 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
       paginateTemplate = new Db2PaginateSqlTemplate();
       topTemplate = new Db2TopSqlTemplate();
     }
-    else if (databaseType == DatabaseType.MSSQL) {
+    else if (databaseType == DatabaseType.MSSQL95 || databaseType == DatabaseType.MSSQL2008) {//TODO need better paginateTemplate for MSSQL 2008 due to new paginate sytax
       paginateTemplate = new MSSqlPaginateSqlTemplate();
       topTemplate = new MSSqlTopSqlTemplate();
     }
@@ -87,7 +83,7 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
       topTemplate = new OracleTopSqlTemplate();
     }
     else if (databaseType == DatabaseType.SYBASE) {
-      //currently Sybase does not support any pagination mechanism 
+      //currently Sybase does not support any good pagination mechanism 
       paginateTemplate = null;
       topTemplate = new MSSqlTopSqlTemplate();
     }
@@ -104,6 +100,14 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
       logger.info("TopSqlTemplate: " + topTemplate.getClass() + " will be used for top queries.");
     }
   }
+  
+  public SpringSqlUtilWithDbAwareImpl(JdbcTemplate jdbcTemplate, DataSource dataSource, PaginateSqlTemplate paginateTemplate, TopSqlTemplate topTemplate, ColumnMapper columnMapper) throws IllegalArgumentException, NullPointerException {
+    
+    super(jdbcTemplate, dataSource, columnMapper);
+    this.paginateTemplate = paginateTemplate;
+    this.topTemplate = topTemplate;
+        
+  }
 
   @Override
   public <E> PageContainer<E> findWithPagination(String sql, int page, int rowsPerPage, Class<E> clazz, Object... params) {
@@ -114,19 +118,15 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
     PageContainer<E> pc;
 
     if (paginateTemplate != null) {
-      // pc = getPageContainer(sql, page, rowsPerPage, clazz, params);
-      // sql = sql.toUpperCase();
       String orderByColumns = getOrderByColumns(sql);
       sql = trimOrderBy(sql);
       String cntSql = paginateTemplate.formatCountSql(sql);
-      // if(AppStaticConfig.BASE_DEBUG) {
-      // LoggerUtil.debug("Count sql: "+cntSql);
-      // }
-      int cnt = this.findCount(cntSql, params);
+      logger.debug("Count Sql: {}", cntSql);
+      
+      int cnt = findCount(cntSql, params);
       sql = paginateTemplate.formatPaginateSql(sql, orderByColumns, page, rowsPerPage);
-      // if(AppStaticConfig.BASE_DEBUG) {
-      // LoggerUtil.debug("paginate sql: "+sql);
-      // }
+      logger.debug("Paginate Sql: {}", sql);
+      
       List<E> list = this.find(sql, clazz, params);
       pc = new BasePageContainer<E>();
       pc.setRows(list);
@@ -148,19 +148,15 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
 
     if (paginateTemplate != null) {
 
-      sql = sql.toUpperCase();
       String orderByColumns = getOrderByColumns(sql);
       sql = trimOrderBy(sql);
       String cntSql = paginateTemplate.formatCountSql(sql);
-      // if(AppStaticConfig.BASE_DEBUG) {
-      // LoggerUtil.debug("Count sql: "+cntSql);
-      // }
+      logger.debug("Count Sql: {}", cntSql);
 
-      int cnt = this.findCount(cntSql, params);
+      int cnt = findCount(cntSql, params);
       sql = paginateTemplate.formatPaginateSql(sql, orderByColumns, page, rowsPerPage);
-      // if(AppStaticConfig.BASE_DEBUG) {
-      // LoggerUtil.debug("paginate sql: "+sql);
-      // }
+      logger.debug("Paginate Sql: {}", sql);
+      
       List<Map<String, Object>> list = this.findWithMap(sql, params);
       pc = new BasePageContainer<Map<String, Object>>();
       pc.setRows(list);
@@ -182,9 +178,6 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
 
   private String trimOrderBy(String sql) {
 
-    // if(sql.contains("ORDER BY ")) {
-    // sql = sql.substring(0, sql.lastIndexOf("ORDER BY "));
-    // }
     String[] sqlChunk = orderByPattern.split(sql);
     if (sqlChunk.length > 1) {
 
@@ -212,11 +205,6 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
     if (sqlChunk.length > 1) {
       orderByColumnName = sqlChunk[sqlChunk.length - 1];
     }
-    // if(sql.contains("ORDER BY ")) {
-    // orderByColumnName = sql.substring(sql.lastIndexOf("ORDER BY "),
-    // sql.length());
-    // orderByColumnName = orderByColumnName.replace("ORDER BY ", "");
-    // }
     return orderByColumnName;
   }
 
@@ -226,9 +214,7 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
     if (topTemplate != null) {
       sql = topTemplate.formatTopSql(sql, top);
     }
-    // if(AppStaticConfig.BASE_DEBUG) {
-    // LoggerUtil.debug("top sql: "+sql);
-    // }
+    logger.debug("top sql: {}", sql);
     return super.findTop(sql, top, clazz, params);
   }
 
@@ -238,35 +224,7 @@ public class SpringSqlUtilWithDbAwareImpl extends SpringSqlUtil {
     if (topTemplate != null) {
       sql = topTemplate.formatTopSql(sql, top);
     }
-    // if(AppStaticConfig.BASE_DEBUG) {
-    // LoggerUtil.debug("top sql: "+sql);
-    // }
+    logger.debug("top sql: {}", sql);
     return super.findTopWithMap(sql, top, params);
   }
-
-//  @Override
-//  public boolean exists(String fromSql, Object... params) {
-//    return this.findTopWithMap("SELECT 1 "+fromSql, 1, params) != null;
-//  }
-  
-  
-
-  // public static void main(String[] args) {
-  //
-  // String sql = "select * from mytalbe Order By id ";
-  // Pattern p = Pattern.compile(" ORDER BY ", Pattern.CASE_INSENSITIVE);
-  // Matcher m = p.matcher(sql);
-  // System.out.println(m.matches());
-  // for(String s : p.split(sql) ){
-  // System.out.println(s);
-  // }
-  // System.out.println(m.matches());
-  // for(String s : sql.split(".*\\sORDER BY\\s.*") ){
-  // System.out.println(s);
-  // }
-  //
-  // //MatchResult mr = m.toMatchResult();
-  //
-  // // System.out.println(m.end());
-  // }
 }

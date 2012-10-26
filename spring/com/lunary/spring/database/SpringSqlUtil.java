@@ -1,26 +1,32 @@
 package com.lunary.spring.database;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import javax.sql.DataSource;
 
-import org.apache.commons.dbutils.BasicRowProcessor;
 import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.ColumnMapRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ResultSetExtractor;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.StatementCreatorUtils;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
-import org.springframework.jdbc.support.lob.DefaultLobHandler;
-import org.springframework.jdbc.support.lob.LobHandler;
 
+import com.lunary.database.ColumnMapper;
+import com.lunary.database.PageContainer;
+import com.lunary.database.SqlUtil;
 import com.lunary.database.exception.DatabaseException;
-import com.lunary.database.impl.AbstractSqlUtil;
 import com.lunary.database.util.StatementUtil;
 import com.lunary.database.util.StatementUtil.SqlStatement;
 import com.lunary.database.util.TableEntityUtil;
 import com.lunary.model.IdKeyedTableEntity;
 import com.lunary.model.TableEntity;
+import com.lunary.spring.database.extractor.ListExtractor;
+import com.lunary.spring.database.extractor.PaginateExtractor;
 import com.lunary.util.CollectionUtil;
 import com.lunary.util.factory.Factory;
 /**
@@ -34,29 +40,22 @@ import com.lunary.util.factory.Factory;
  * @author Steven
  * 
  */
-public class SpringSqlUtil extends AbstractSqlUtil {
+public class SpringSqlUtil implements SqlUtil {
 
   private final String autoGenerateColumnName = IdKeyedTableEntity.ID;
   private final JdbcTemplate jdbcTemplate;
 
-  // private final Factory<SimpleJdbcCall> spFactory;
-  // private final Factory<SimpleJdbcCall> resultSetSpFactory;
-
   private final ConcurrentMap<String, SimpleJdbcInsert> insertMap = new ConcurrentHashMap<String, SimpleJdbcInsert>();
   private Factory<SimpleJdbcInsert> insertFactory;
-  //private final LobHandler lobHandler;
+  private final ColumnMapper columnMapper;
 
-  // private static final Map<String, Object> emptyMap = Collections.emptyMap();
-
-//  protected RowProcessor rowProcessor;
-  
-  public SpringSqlUtil(final JdbcTemplate jdbcTemplate, DataSource dataSource, LobHandler lobHandler) {
+  public SpringSqlUtil(final JdbcTemplate jdbcTemplate, DataSource dataSource, ColumnMapper columnMapper) throws NullPointerException {
     
-    super(dataSource, new BasicRowProcessor(new SpringBeanProcessor(lobHandler)));
+    //super(dataSource, new BasicRowProcessor(new SpringBeanProcessor(lobHandler)));
     if (jdbcTemplate == null) {
       throw new NullPointerException("jdbcTemplate cannot be null");
     }
-    //this.lobHandler = lobHandler;
+    this.columnMapper = columnMapper;
     this.jdbcTemplate = jdbcTemplate;
     
     this.insertFactory = new Factory<SimpleJdbcInsert>() {
@@ -74,7 +73,7 @@ public class SpringSqlUtil extends AbstractSqlUtil {
   }
   
   public SpringSqlUtil(JdbcTemplate jdbcTemplate, DataSource dataSource) {
-    this(jdbcTemplate, dataSource, new DefaultLobHandler());
+    this(jdbcTemplate, dataSource, new SpringColumnMapper());
   }
 
   protected JdbcTemplate getJdbcTemplate() {
@@ -97,7 +96,7 @@ public class SpringSqlUtil extends AbstractSqlUtil {
       return jdbcTemplate.update(sql, params);
     }
     catch (DataAccessException e){
-      throw new DatabaseException(e);
+      throw translateException(e);
     }
   }
 
@@ -150,11 +149,7 @@ public class SpringSqlUtil extends AbstractSqlUtil {
   @Override
   public int update(TableEntity entity) {
 
-    // entity.setModify_dt(DateUtil.getTimestamp());
     SqlStatement sset = StatementUtil.buildPreparedUpdateStatement(entity, false);
-    // if(AppStaticConfig.BASE_DEBUG) {
-    // LoggerUtil.debug(sset.toString());
-    // }
     int cnt = this.updateWithoutParamCheck(sset.getSql(), sset.getParams());
 
     return cnt;
@@ -170,4 +165,131 @@ public class SpringSqlUtil extends AbstractSqlUtil {
     return this.updateWithoutParamCheck(sset.getSql(), sset.getParams());
   }
 
+  @Override
+  public <E> List<E> find(String sql, Class<E> clazz, Object... params) {
+
+    ResultSetExtractor<List<E>> rse = new ListExtractor<E>(new BaseBeanPropertyRowMapper<E>(clazz, columnMapper));
+    return query(sql, rse, params);
+  }
+
+  @Override
+  public int findCount(String sql, Object... params) {
+    try {
+      convert(params);
+      return jdbcTemplate.queryForInt(sql, params);
+    }
+    catch (DataAccessException e) {
+      throw translateException(e);
+    }
+  }
+
+  @Override
+  public boolean exists(String fromSql, Object... params) {
+    return findTopWithMap("SELECT 1 " + fromSql, 1, params).size() > 0;
+  }
+
+  @Override
+  public <E> E findOne(String sql, Class<E> clazz, Object... params) {
+    try {
+      convert(params);
+      return jdbcTemplate.queryForObject(sql, params, new BaseBeanPropertyRowMapper<E>(clazz, columnMapper));
+    }
+    catch (DataAccessException e) {
+      throw translateException(e);
+    }
+  }
+
+  @Override
+  public Map<String, Object> findOneWithMap(String sql, Object... params) {
+    try {
+      convert(params);
+      return jdbcTemplate.queryForMap(sql, params);
+    }
+    catch (DataAccessException e) {
+      throw translateException(e);
+    }
+  }
+
+  @Override
+  public <E> List<E> findTop(String sql, int top, Class<E> clazz, Object... params) {
+    ResultSetExtractor<List<E>> rse = new ListExtractor<E>(new BaseBeanPropertyRowMapper<E>(clazz, columnMapper), top);
+    return query(sql, rse, params);
+  }
+
+  @Override
+  public List<Map<String, Object>> findTopWithMap(String sql, int top, Object... params) {
+    ResultSetExtractor<List<Map<String, Object>>> rse = new ListExtractor<Map<String, Object>>(getColumnMapRowMapper(), top);
+    return query(sql, rse, params);
+  }
+
+  @Override
+  public List<Map<String, Object>> findWithMap(String sql, Object... params) {
+    try {
+      convert(params);
+      return jdbcTemplate.queryForList(sql, params);
+    }
+    catch (DataAccessException e) {
+      throw translateException(e);
+    }
+  }
+
+  @Override
+  public <E> PageContainer<E> findWithPagination(String sql, int page, int rowsPerPage, Class<E> clazz, Object... params) {
+    ResultSetExtractor<PageContainer<E>> rse = new PaginateExtractor<E>(new BaseBeanPropertyRowMapper<E>(clazz, columnMapper), page, rowsPerPage);
+    return query(sql, rse, params);
+  }
+
+  @Override
+  public PageContainer<Map<String, Object>> findWithPaginationMap(String sql, int page, int rowsPerPage, Object... params) {
+    ResultSetExtractor<PageContainer<Map<String, Object>>> rse = new PaginateExtractor<Map<String, Object>>(getColumnMapRowMapper(), page, rowsPerPage);
+    return query(sql, rse, params);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <E extends TableEntity> E findByKey(E entity) {
+    
+    List<Object> keyValues = new ArrayList<Object>();
+    StringBuilder sql = new StringBuilder("SELECT * FROM ");
+    sql.append(entity.getTableName()).append(" WHERE ");
+    sql.append(StatementUtil.assembleKeyStatement(entity, keyValues));
+//    logger.debug(sql.toString() + " params: " + keyValues.toString());
+    return (E) this.findOne(sql.toString(), entity.getClass(), keyValues.toArray());
+  }
+  
+  protected RowMapper<Map<String, Object>> getColumnMapRowMapper() {
+    return new ColumnMapRowMapper();
+  }
+  
+  private <E> E query(String sql, ResultSetExtractor<E> extractor, Object... params) {
+
+    E obj = null;
+    try {
+      convertParams(params);
+      obj = jdbcTemplate.query(sql, params, extractor);//getQueryRunner().query(getConnection(), sql, rsHandler, params);
+    }
+    catch (DataAccessException e) {
+      throw translateException(e);
+    }
+    return obj;
+  }
+
+  protected RuntimeException translateException(Exception e) {
+    return new DatabaseException(e);
+  }
+
+  protected Object[] convertParams(Object[] params) {
+
+    if (params != null) {
+      for (int i = 0; i < params.length; i++) {
+        params[i] = convert(params[i]);
+      }
+    }
+    return params;
+  }
+
+  protected Object convert(Object param) {
+
+    return TableEntityUtil.convertToSqlObject(param.getClass(), param);
+  }
 }
