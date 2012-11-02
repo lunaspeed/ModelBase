@@ -2,6 +2,8 @@
 package com.lunary.dbutils.database;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,20 +24,23 @@ import com.lunary.database.PageContainer;
 import com.lunary.database.SqlUtil;
 import com.lunary.database.exception.DatabaseException;
 import com.lunary.database.util.StatementUtil;
+import com.lunary.database.util.StatementUtil.SqlStatement;
 import com.lunary.database.util.TableEntityUtil;
 import com.lunary.dbutils.database.handler.BeanPaginationHandler;
 import com.lunary.dbutils.database.handler.BeanTopHandler;
 import com.lunary.dbutils.database.handler.MapPaginationHandler;
 import com.lunary.dbutils.database.handler.MapTopHandler;
+import com.lunary.model.IdKeyedTableEntity;
 import com.lunary.model.TableEntity;
 
-public abstract class AbstractSqlUtil implements SqlUtil {
+public class BaseSqlUtil implements SqlUtil {
 
+  private final String[] ID_FIELD = new String[]{IdKeyedTableEntity.ID};
   private final DataSource dataSource;
   private final QueryRunner queryRunner;
   private final RowProcessor rowProcessor;
   
-  public AbstractSqlUtil(DataSource dataSource, RowProcessor rowProcessor) {
+  public BaseSqlUtil(DataSource dataSource, RowProcessor rowProcessor) {
     this.dataSource = dataSource;
     this.rowProcessor = rowProcessor;
     this.queryRunner = new QueryRunner(dataSource);
@@ -84,10 +89,6 @@ public abstract class AbstractSqlUtil implements SqlUtil {
   @Override
   public int findCount(String sql, Object... params) {
 
-    // if (!sql.toUpperCase().startsWith("SELECT COUNT(")) {
-    // throw translateException(new
-    // SQLException("Sql does not contain COUNT() as the first function."));
-    // }
     int cnt = 0;
     try {
       convertParams(params);
@@ -106,43 +107,6 @@ public abstract class AbstractSqlUtil implements SqlUtil {
   public boolean exists(String fromSql, Object... params) {
     return findTopWithMap("SELECT 1 " + fromSql, 1, params).size() > 0;
   }
-
-  // /**
-  // *
-  // * {@inheritDoc}
-  // */
-  // public <E> Set<E> findColumn(String sql, String columnName, Object...
-  // params) {
-  //
-  // ResultSetHandler<Set<E>> rsHandler = new ColumnSetHandler<E>(columnName);
-  // return query(sql, rsHandler, params);
-  // }
-
-  // /**
-  // *
-  // * {@inheritDoc}
-  // */
-  // @Override
-  // public <E, V> Map<E, V> findMap(String sql, String columnName, Class<V>
-  // clazz, Object... params) {
-  //
-  // ResultSetHandler<Map<E, V>> rsHandler = new KeyedEntityHandler<E,
-  // V>(columnName, clazz, rowProcessor);
-  // return query(sql, rsHandler, params);
-  // }
-
-  // /**
-  // *
-  // *
-  // * {@inheritDoc}
-  // */
-  // @SuppressWarnings("unchecked")
-  // public <E> Map<E, Map<String, Object>> findMapWithMap(String sql, String
-  // columnName, Object... params) {
-  //
-  // ResultSetHandler rsHandler = new KeyedHandler(columnName);
-  // return (Map<E, Map<String, Object>>) query(sql, rsHandler, params);
-  // }
 
   /**
    * {@inheritDoc}
@@ -203,9 +167,6 @@ public abstract class AbstractSqlUtil implements SqlUtil {
     if (page <= 0) {
       page = 1;
     }
-    // if (rowsPerPage <= 0) {
-    // rowsPerPage = AppStaticConfig.ROWS_PER_PAGE;
-    // }
 
     ResultSetHandler<PageContainer<E>> rsHandler = new BeanPaginationHandler<E>(clazz, page, rowsPerPage, rowProcessor);
     return query(sql, rsHandler, params);
@@ -220,10 +181,7 @@ public abstract class AbstractSqlUtil implements SqlUtil {
     if (page <= 0) {
       page = 1;
     }
-    // if (rowsPerPage <= 0) {
-    // rowsPerPage = AppStaticConfig.ROWS_PER_PAGE;
-    // }
-
+    
     ResultSetHandler<PageContainer<Map<String, Object>>> rsHandler = new MapPaginationHandler(page, rowsPerPage);
     return query(sql, rsHandler, params);
   }
@@ -259,4 +217,65 @@ public abstract class AbstractSqlUtil implements SqlUtil {
 
     return TableEntityUtil.convertToSqlObject(param.getClass(), param);
   }
+  
+  @Override
+  public int update(String sql, Object... params) {
+    return convertAndUpdate(sql, params);
+  }
+
+  @Override
+  public int insert(TableEntity entity) {
+    
+    SqlStatement sset = StatementUtil.buildPreparedInsertStatement(entity);
+    int cnt = 0;
+    if(entity instanceof IdKeyedTableEntity) {
+      try {
+        PreparedStatement stmt = getConnection().prepareStatement(sset.getSql(), ID_FIELD); 
+        getQueryRunner().fillStatement(stmt, sset.getParams());
+        cnt = stmt.executeUpdate();
+        ResultSet rs = stmt.getGeneratedKeys();
+        ResultSetHandler<Long> rsh = new ScalarHandler<Long>();
+        ((IdKeyedTableEntity) entity).setId(rsh.handle(rs));
+      }
+      catch(SQLException e) {
+        throw translateException(e);
+      }
+    }
+    else {
+      cnt = convertAndUpdate(sset.getSql(), sset.getParams());
+    }
+    return cnt;
+  }
+
+  @Override
+  public int update(TableEntity entity) {
+    SqlStatement sset = StatementUtil.buildPreparedUpdateStatement(entity, false);
+    return convertAndUpdate(sset.getSql(), sset.getParams());
+  }
+
+  @Override
+  public int updateWithNull(TableEntity entity) {
+    SqlStatement sset = StatementUtil.buildPreparedUpdateStatement(entity, true);
+    return convertAndUpdate(sset.getSql(), sset.getParams());
+  }
+
+  @Override
+  public int delete(TableEntity entity) {
+    
+    SqlStatement sset = StatementUtil.buildDeleteStatement(entity);
+    return convertAndUpdate(sset.getSql(), sset.getParams());
+  }
+  
+  private int convertAndUpdate(String sql, Object[] params) {
+    int cnt = 0;
+    try {
+      convertParams(params);
+      cnt = getQueryRunner().update(getConnection(), sql, params);
+    }
+    catch(SQLException e) {
+      throw translateException(e);
+    }
+    return cnt;
+  }
+
 }

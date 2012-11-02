@@ -31,12 +31,10 @@ import com.lunary.util.CollectionUtil;
 import com.lunary.util.factory.Factory;
 /**
  * <pre>
- * This implementation mainly uses QueryRunner mechanism.
- * All result set handling logic class implements ResultSetHandler.
+ * This implementation mainly uses JdbcTemplate mechanism.
  * </pre>
  * 
- * @see org.apache.commons.dbutils.QueryRunner
- * @see org.apache.commons.dbutils.ResultSetHandler
+ * @see org.springframework.jdbc.core.JdbcTemplate
  * @author Steven
  * 
  */
@@ -80,6 +78,10 @@ public class SpringSqlUtil implements SqlUtil {
     return jdbcTemplate;
   }
 
+  protected ColumnMapper getColumnMapper() {
+    return columnMapper;
+  }
+  
   /**
    * {@inheritDoc}
    */
